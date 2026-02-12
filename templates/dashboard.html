@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h2>Dashboard - {{ username }} ({{ role }})</h2>
+<a href="/logout">Cerrar sesión</a>
+
+{% if role == "director" %}
+
+<h3>Métricas Generales</h3>
+<p>Total Leads: {{ metrics.total }}</p>
+<p>Cerrados: {{ metrics.closed }}</p>
+<p>Tasa de Cierre: {{ metrics.close_rate }}%</p>
+
+<hr>
+
+<h3>Leads por Agente</h3>
+<canvas id="agentChart" width="400" height="200"></canvas>
+
+<h3>Leads por Estado</h3>
+<canvas id="statusChart" width="400" height="200"></canvas>
+
+<hr>
+
+<script>
+const agentData = {
+    labels: {{ metrics.by_agent | map(attribute=0) | list | safe }},
+    datasets: [{
+        label: 'Leads por Agente',
+        data: {{ metrics.by_agent | map(attribute=1) | list | safe }},
+    }]
+};
+
+const agentChart = new Chart(
+    document.getElementById('agentChart'),
+    {
+        type: 'bar',
+        data: agentData,
+    }
+);
+
+const statusData = {
+    labels: {{ metrics.by_status | map(attribute=0) | list | safe }},
+    datasets: [{
+        label: 'Leads por Estado',
+        data: {{ metrics.by_status | map(attribute=1) | list | safe }},
+    }]
+};
+
+const statusChart = new Chart(
+    document.getElementById('statusChart'),
+    {
+        type: 'pie',
+        data: statusData,
+    }
+);
+</script>
+
+{% endif %}
+
+<hr>
+
+<table border="1" cellpadding="5">
+<tr>
+<th>ID</th>
+<th>Nombre</th>
+<th>Edad</th>
+<th>Score</th>
+<th>Teléfono</th>
+<th>Estado</th>
+<th>Agente</th>
+<th>Actualizar</th>
+</tr>
+
+{% for lead in leads %}
+<tr>
+<td>{{ lead[0] }}</td>
+<td>{{ lead[1] }}</td>
+<td>{{ lead[2] }}</td>
+<td>{{ lead[4] }}</td>
+<td>{{ lead[5] }}</td>
+<td>{{ lead[7] }}</td>
+<td>{{ lead[8] }}</td>
+
+<td>
+<form method="POST" action="/update_status">
+<input type="hidden" name="lead_id" value="{{ lead[0] }}">
+<select name="status">
+{% for status in status_options %}
+<option value="{{ status }}" {% if status == lead[7] %}selected{% endif %}>
+{{ status }}
+</option>
+{% endfor %}
+</select>
+<button type="submit">Guardar</button>
+</form>
+</td>
+
+</tr>
+{% endfor %}
+</table>
+
+</body>
+</html>

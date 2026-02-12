@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leads Capturados</title>
+</head>
+<body>
+    <h1>Leads Capturados</h1>
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>Nombre</th>
+            <th>Edad</th>
+            <th>Hijos</th>
+            <th>Score</th>
+            <th>Teléfono</th>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th>Agente</th>
+        </tr>
+
+        {% for lead in leads %}
+        <tr>
+            <td>{{ lead[0] }}</td>
+            <td>{{ lead[1] }}</td>
+            <td>{{ lead[2] }}</td>
+            <td>{{ lead[3] }}</td>
+            <td>{{ lead[4] }}</td>
+            <td>{{ lead[5] }}</td>
+            <td>{{ lead[6] }}</td>
+            <td>{{ lead[7] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

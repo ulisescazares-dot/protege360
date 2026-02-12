@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Protege360 Chat</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            margin-top: 50px;
+        }
+        #chat {
+            width: 400px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .msg { margin: 5px 0; }
+        .bot { color: blue; }
+        .user { color: green; text-align: right; }
+        button { margin: 5px 3px; }
+    </style>
+</head>
+<body>
+
+<div id="chat">
+    <div id="messages"></div>
+    <div id="options"></div>
+    <input type="text" id="input" placeholder="Escribe aquí..." />
+    <button onclick="sendMessage()">Enviar</button>
+</div>
+
+<script>
+let state = {"level": "start", "data": {}};
+
+function addMessage(text, sender) {
+    const div = document.createElement("div");
+    div.className = "msg " + sender;
+    div.innerText = text;
+    document.getElementById("messages").appendChild(div);
+}
+
+function sendMessage(textOverride = null) {
+    const input = document.getElementById("input");
+    const message = textOverride || input.value;
+
+    if (!message) return;
+
+    addMessage(message, "user");
+    input.value = "";
+
+    fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            message: message,
+            state: state
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        state = data.state;
+        addMessage(data.reply, "bot");
+
+        const optionsDiv = document.getElementById("options");
+        optionsDiv.innerHTML = "";
+
+        if (data.options && data.options.length > 0) {
+            data.options.forEach(opt => {
+                const btn = document.createElement("button");
+                btn.innerText = opt;
+                btn.onclick = () => sendMessage(opt);
+                optionsDiv.appendChild(btn);
+            });
+        }
+    });
+}
+
+fetch("/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+        message: "",
+        state: state
+    })
+})
+.then(res => res.json())
+.then(data => {
+    state = data.state;
+    addMessage(data.reply, "bot");
+});
+</script>
+
+</body>
+</html>
