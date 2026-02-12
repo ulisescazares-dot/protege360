@@ -1,107 +1,163 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100">
 
-<h2>Dashboard - {{ username }} ({{ role }})</h2>
-<a href="/logout">Cerrar sesión</a>
+<div class="flex min-h-screen">
 
-{% if role == "director" %}
+    <!-- Sidebar -->
+    <div class="w-64 bg-blue-900 text-white p-6">
+        <h2 class="text-2xl font-bold mb-8">Protege360</h2>
+        <p class="mb-4">Usuario: {{ username }}</p>
+        <p class="mb-8 capitalize">{{ role }}</p>
+        <a href="/logout" class="bg-white text-blue-900 px-4 py-2 rounded block text-center">
+            Cerrar sesión
+        </a>
+    </div>
 
-<h3>Métricas Generales</h3>
-<p>Total Leads: {{ metrics.total }}</p>
-<p>Cerrados: {{ metrics.closed }}</p>
-<p>Tasa de Cierre: {{ metrics.close_rate }}%</p>
+    <!-- Main Content -->
+    <div class="flex-1 p-8">
 
-<hr>
+        <h1 class="text-3xl font-bold text-blue-900 mb-6">
+            Dashboard
+        </h1>
 
-<h3>Leads por Agente</h3>
-<canvas id="agentChart" width="400" height="200"></canvas>
+        {% if role == "director" %}
 
-<h3>Leads por Estado</h3>
-<canvas id="statusChart" width="400" height="200"></canvas>
+        <!-- Cards -->
+        <div class="grid grid-cols-3 gap-6 mb-8">
 
-<hr>
+            <div class="bg-white shadow rounded p-6">
+                <h3 class="text-gray-500">Total Leads</h3>
+                <p class="text-3xl font-bold text-blue-900">
+                    {{ metrics.total }}
+                </p>
+            </div>
 
-<script>
-const agentData = {
-    labels: {{ metrics.by_agent | map(attribute=0) | list | safe }},
-    datasets: [{
-        label: 'Leads por Agente',
-        data: {{ metrics.by_agent | map(attribute=1) | list | safe }},
-    }]
-};
+            <div class="bg-white shadow rounded p-6">
+                <h3 class="text-gray-500">Cerrados</h3>
+                <p class="text-3xl font-bold text-green-600">
+                    {{ metrics.closed }}
+                </p>
+            </div>
 
-const agentChart = new Chart(
-    document.getElementById('agentChart'),
-    {
-        type: 'bar',
-        data: agentData,
-    }
-);
+            <div class="bg-white shadow rounded p-6">
+                <h3 class="text-gray-500">Tasa de Cierre</h3>
+                <p class="text-3xl font-bold text-blue-900">
+                    {{ metrics.close_rate }}%
+                </p>
+            </div>
 
-const statusData = {
-    labels: {{ metrics.by_status | map(attribute=0) | list | safe }},
-    datasets: [{
-        label: 'Leads por Estado',
-        data: {{ metrics.by_status | map(attribute=1) | list | safe }},
-    }]
-};
+        </div>
 
-const statusChart = new Chart(
-    document.getElementById('statusChart'),
-    {
-        type: 'pie',
-        data: statusData,
-    }
-);
-</script>
+        <!-- Charts -->
+        <div class="grid grid-cols-2 gap-8 mb-8">
 
-{% endif %}
+            <div class="bg-white shadow rounded p-6">
+                <h3 class="mb-4 font-semibold text-blue-900">
+                    Leads por Agente
+                </h3>
+                <canvas id="agentChart"></canvas>
+            </div>
 
-<hr>
+            <div class="bg-white shadow rounded p-6">
+                <h3 class="mb-4 font-semibold text-blue-900">
+                    Leads por Estado
+                </h3>
+                <canvas id="statusChart"></canvas>
+            </div>
 
-<table border="1" cellpadding="5">
-<tr>
-<th>ID</th>
-<th>Nombre</th>
-<th>Edad</th>
-<th>Score</th>
-<th>Teléfono</th>
-<th>Estado</th>
-<th>Agente</th>
-<th>Actualizar</th>
-</tr>
+        </div>
 
-{% for lead in leads %}
-<tr>
-<td>{{ lead[0] }}</td>
-<td>{{ lead[1] }}</td>
-<td>{{ lead[2] }}</td>
-<td>{{ lead[4] }}</td>
-<td>{{ lead[5] }}</td>
-<td>{{ lead[7] }}</td>
-<td>{{ lead[8] }}</td>
+        <script>
+        const agentChart = new Chart(
+            document.getElementById('agentChart'),
+            {
+                type: 'bar',
+                data: {
+                    labels: {{ metrics.by_agent | map(attribute=0) | list | safe }},
+                    datasets: [{
+                        data: {{ metrics.by_agent | map(attribute=1) | list | safe }},
+                        backgroundColor: '#1E3A8A'
+                    }]
+                }
+            }
+        );
 
-<td>
-<form method="POST" action="/update_status">
-<input type="hidden" name="lead_id" value="{{ lead[0] }}">
-<select name="status">
-{% for status in status_options %}
-<option value="{{ status }}" {% if status == lead[7] %}selected{% endif %}>
-{{ status }}
-</option>
-{% endfor %}
-</select>
-<button type="submit">Guardar</button>
-</form>
-</td>
+        const statusChart = new Chart(
+            document.getElementById('statusChart'),
+            {
+                type: 'doughnut',
+                data: {
+                    labels: {{ metrics.by_status | map(attribute=0) | list | safe }},
+                    datasets: [{
+                        data: {{ metrics.by_status | map(attribute=1) | list | safe }},
+                        backgroundColor: [
+                            '#1E3A8A',
+                            '#2563EB',
+                            '#60A5FA',
+                            '#10B981',
+                            '#EF4444'
+                        ]
+                    }]
+                }
+            }
+        );
+        </script>
 
-</tr>
-{% endfor %}
-</table>
+        {% endif %}
+
+        <!-- Leads Table -->
+        <div class="bg-white shadow rounded p-6">
+            <h2 class="text-xl font-semibold mb-4 text-blue-900">
+                Leads
+            </h2>
+
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b">
+                        <th class="py-2">Nombre</th>
+                        <th>Score</th>
+                        <th>Teléfono</th>
+                        <th>Estado</th>
+                        <th>Actualizar</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                {% for lead in leads %}
+                <tr class="border-b">
+                    <td class="py-2">{{ lead[1] }}</td>
+                    <td>{{ lead[4] }}</td>
+                    <td>{{ lead[5] }}</td>
+                    <td>{{ lead[7] }}</td>
+                    <td>
+                        <form method="POST" action="/update_status">
+                            <input type="hidden" name="lead_id" value="{{ lead[0] }}">
+                            <select name="status" class="border rounded px-2 py-1">
+                                {% for status in status_options %}
+                                <option value="{{ status }}" {% if status == lead[7] %}selected{% endif %}>
+                                    {{ status }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <button class="bg-blue-900 text-white px-3 py-1 rounded">
+                                Guardar
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
 
 </body>
 </html>
