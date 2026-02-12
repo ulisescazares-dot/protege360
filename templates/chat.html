@@ -20,7 +20,7 @@
         </p>
     </div>
 
-    <!-- Chat Window -->
+    <!-- Chat -->
     <div id="messages" class="p-4 h-96 overflow-y-auto space-y-3 bg-gray-50"></div>
 
     <!-- Input -->
@@ -73,6 +73,26 @@ function sendMessage(textOverride = null) {
     .then(data => {
         state = data.state;
         addMessage(data.reply, "bot");
+
+        const messagesDiv = document.getElementById("messages");
+
+        if (data.options && data.options.length > 0) {
+            data.options.forEach(opt => {
+
+                const btn = document.createElement("button");
+                btn.className = "block w-full mt-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800";
+
+                if (typeof opt === "string") {
+                    btn.innerText = opt;
+                    btn.onclick = () => sendMessage(opt);
+                } else if (opt.url) {
+                    btn.innerText = opt.label;
+                    btn.onclick = () => window.open(opt.url, "_blank");
+                }
+
+                messagesDiv.appendChild(btn);
+            });
+        }
     });
 }
 
