@@ -92,37 +92,70 @@ def chat():
     options = []
 
     if state["level"] == "start":
-        reply = "👋 Hola. ¿Cuántos años tienes?"
+        reply = ("Hola 👋\n\n"
+                 "Soy el asistente digital de protección financiera.\n"
+                 "En menos de 2 minutos puedo identificar tu nivel de exposición financiera.\n\n"
+                 "Para comenzar, ¿cuántos años tienes?")
         state["level"] = "age"
 
     elif state["level"] == "age":
-        state["data"]["age"] = int(message)
-        reply = "¿Tienes hijos?"
+        try:
+            age = int(message)
+            state["data"]["age"] = age
+            reply = ("Gracias.\n\n"
+                     "¿Hay personas que dependan económicamente de ti?")
+            options = ["Sí", "No"]
+            state["level"] = "dependents"
+        except:
+            reply = "Por favor ingresa tu edad en números."
+
+    elif state["level"] == "dependents":
+        state["data"]["dependents"] = message
+        reply = "¿Actualmente cuentas con seguro de vida?"
         options = ["Sí", "No"]
-        state["level"] = "children"
+        state["level"] = "life_insurance"
 
-    elif state["level"] == "children":
-        state["data"]["children"] = message
+    elif state["level"] == "life_insurance":
+        state["data"]["life_insurance"] = message
+        reply = "¿Cuentas con seguro médico privado?"
+        options = ["Sí", "No"]
+        state["level"] = "medical_insurance"
 
+    elif state["level"] == "medical_insurance":
+        state["data"]["medical_insurance"] = message
+
+        # Cálculo simple de exposición
         score = 0
-        age = state["data"]["age"]
 
-        if 25 <= age <= 45:
-            score += 30
-        elif age > 45:
-            score += 20
-
-        if message.lower() == "sí":
+        if state["data"]["dependents"] == "Sí":
             score += 40
+
+        if state["data"]["life_insurance"] == "No":
+            score += 30
+
+        if state["data"]["medical_insurance"] == "No":
+            score += 30
 
         state["data"]["score"] = score
 
-        reply = f"Tu nivel de vulnerabilidad financiera es {score}/100.\n\nEscribe tu nombre completo."
+        if score >= 70:
+            level = "ALTA"
+        elif score >= 40:
+            level = "MODERADA"
+        else:
+            level = "BAJA"
+
+        reply = (f"Resultado de Evaluación:\n\n"
+                 f"Tu nivel de exposición financiera es {level}.\n\n"
+                 "Un asesor certificado revisará tu perfil y podrá orientarte "
+                 "sobre las mejores opciones de protección para tu situación.\n\n"
+                 "Por favor escribe tu nombre completo.")
+
         state["level"] = "name"
 
     elif state["level"] == "name":
         state["data"]["name"] = message
-        reply = "Ahora escribe tu número de WhatsApp."
+        reply = "Ahora escribe tu número de WhatsApp para que podamos contactarte."
         state["level"] = "phone"
 
     elif state["level"] == "phone":
@@ -138,9 +171,9 @@ def chat():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             state["data"]["name"],
-            state["data"]["age"],
-            state["data"]["children"],
-            state["data"]["score"],
+            state["data"].get("age", 0),
+            state["data"].get("dependents", ""),
+            state["data"].get("score", 0),
             state["data"]["phone"],
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Nuevo",
@@ -150,7 +183,10 @@ def chat():
         conn.commit()
         conn.close()
 
-        reply = f"✅ Gracias. Un asesor ({assigned_agent}) se pondrá en contacto contigo pronto."
+        reply = ("Gracias.\n\n"
+                 "Tu información ha sido enviada correctamente.\n"
+                 "Un asesor se pondrá en contacto contigo en breve.")
+
         state["level"] = "closed"
 
     return jsonify({
