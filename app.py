@@ -91,73 +91,100 @@ def chat():
     reply = ""
     options = []
 
+    # ================= START =================
     if state["level"] == "start":
         reply = ("Hola 👋\n\n"
                  "Soy el asistente digital de protección financiera.\n"
-                 "En menos de 2 minutos puedo identificar tu nivel de exposición financiera.\n\n"
+                 "En menos de 3 minutos puedo ayudarte a identificar la estrategia adecuada para ti.\n\n"
                  "Para comenzar, ¿cuántos años tienes?")
         state["level"] = "age"
 
+    # ================= AGE =================
     elif state["level"] == "age":
         try:
             age = int(message)
             state["data"]["age"] = age
-            reply = ("Gracias.\n\n"
-                     "¿Hay personas que dependan económicamente de ti?")
+            reply = "¿Hay personas que dependan económicamente de ti?"
             options = ["Sí", "No"]
             state["level"] = "dependents"
         except:
             reply = "Por favor ingresa tu edad en números."
 
+    # ================= DEPENDENTS =================
     elif state["level"] == "dependents":
         state["data"]["dependents"] = message
-        reply = "¿Actualmente cuentas con seguro de vida?"
-        options = ["Sí", "No"]
-        state["level"] = "life_insurance"
+        reply = "¿Qué te preocupa más actualmente?"
+        options = [
+            "Proteger a mi familia",
+            "Gastos médicos",
+            "Ambas",
+            "No estoy seguro"
+        ]
+        state["level"] = "priority"
 
-    elif state["level"] == "life_insurance":
-        state["data"]["life_insurance"] = message
-        reply = "¿Cuentas con seguro médico privado?"
-        options = ["Sí", "No"]
-        state["level"] = "medical_insurance"
+    # ================= PRIORITY =================
+    elif state["level"] == "priority":
+        state["data"]["priority"] = message
+        reply = ("De manera aproximada, ¿qué monto mensual estarías dispuesto a invertir en tu protección?")
+        options = [
+            "$1,500 – $2,500",
+            "$2,500 – $4,000",
+            "$4,000 – $7,000",
+            "Más de $7,000"
+        ]
+        state["level"] = "budget"
 
-    elif state["level"] == "medical_insurance":
-        state["data"]["medical_insurance"] = message
+    # ================= BUDGET =================
+    elif state["level"] == "budget":
+        state["data"]["budget"] = message
 
-        # Cálculo simple de exposición
-        score = 0
+        dependents = state["data"]["dependents"]
+        priority = state["data"]["priority"]
 
-        if state["data"]["dependents"] == "Sí":
-            score += 40
-
-        if state["data"]["life_insurance"] == "No":
-            score += 30
-
-        if state["data"]["medical_insurance"] == "No":
-            score += 30
-
-        state["data"]["score"] = score
-
-        if score >= 70:
-            level = "ALTA"
-        elif score >= 40:
-            level = "MODERADA"
+        if priority == "Proteger a mi familia":
+            product = "MetaLife"
+        elif priority == "Gastos médicos":
+            product = "MedicaLife"
+        elif priority == "Ambas":
+            product = "MetaLife + MedicaLife"
         else:
-            level = "BAJA"
+            if dependents == "Sí":
+                product = "MetaLife"
+            else:
+                product = "MedicaLife"
+
+        state["data"]["recommended_product"] = product
 
         reply = (f"Resultado de Evaluación:\n\n"
-                 f"Tu nivel de exposición financiera es {level}.\n\n"
-                 "Un asesor certificado revisará tu perfil y podrá orientarte "
-                 "sobre las mejores opciones de protección para tu situación.\n\n"
-                 "Por favor escribe tu nombre completo.")
+                 f"Producto Recomendado: {product}\n\n"
+                 "Con base en tu perfil y el monto que deseas invertir, "
+                 "existe una estrategia de protección adecuada para ti.\n\n"
+                 "¿Cómo prefieres continuar?")
 
-        state["level"] = "name"
+        options = [
+            "Quiero que me contacten",
+            {
+                "label": "Contactar ahora por WhatsApp",
+                "url": "https://wa.me/5216646346643"
+            }
+        ]
 
+        state["level"] = "decision"
+
+    # ================= DECISION =================
+    elif state["level"] == "decision":
+
+        if message == "Quiero que me contacten":
+            reply = "Perfecto. Por favor escribe tu nombre completo."
+            state["level"] = "name"
+
+    # ================= NAME =================
     elif state["level"] == "name":
         state["data"]["name"] = message
         reply = "Ahora escribe tu número de WhatsApp para que podamos contactarte."
         state["level"] = "phone"
 
+    # ================= PHONE =================
     elif state["level"] == "phone":
         state["data"]["phone"] = message
 
@@ -173,7 +200,7 @@ def chat():
             state["data"]["name"],
             state["data"].get("age", 0),
             state["data"].get("dependents", ""),
-            state["data"].get("score", 0),
+            0,
             state["data"]["phone"],
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Nuevo",
@@ -194,6 +221,7 @@ def chat():
         "options": options,
         "state": state
     })
+
 
 # -------------------------
 # LOGIN (SEGURO)
