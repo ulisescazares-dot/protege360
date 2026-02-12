@@ -1,0 +1,4 @@
+database.db
+*.lnk
+*.txt
+__pycache__/
