@@ -13,7 +13,9 @@
         <h2 class="text-2xl font-bold mb-8">Protege360</h2>
         <p class="mb-4">Usuario: {{ username }}</p>
         <p class="mb-8 capitalize">{{ role }}</p>
-        <a href="/logout" class="bg-white text-blue-900 px-4 py-2 rounded block text-center">
+
+        <a href="/logout"
+           class="bg-white text-blue-900 px-4 py-2 rounded block text-center">
             Cerrar sesión
         </a>
     </div>
@@ -25,9 +27,15 @@
             Dashboard
         </h1>
 
-        {% if role == "director" %}
+        {% if role == "director" and metrics %}
 
-        <!-- Cards -->
+        <div class="bg-yellow-200 p-4 mb-4">
+    DEBUG OVERDUE: {{ metrics.overdue }}
+    <br>
+    DEBUG RESPONSE: {{ metrics.response_times }}
+</div>
+
+        <!-- MÉTRICAS GENERALES -->
         <div class="grid grid-cols-3 gap-6 mb-8">
 
             <div class="bg-white shadow rounded p-6">
@@ -53,7 +61,50 @@
 
         </div>
 
-        <!-- Charts -->
+        <!-- ALERTAS -->
+        <div class="grid grid-cols-2 gap-6 mb-8">
+
+            <div class="bg-red-100 shadow rounded p-6">
+                <h3 class="text-red-700 font-semibold">
+                    Leads sin contactar +2h
+                </h3>
+
+                <p class="text-4xl font-bold text-red-900 mt-2">
+                    {{ metrics.overdue or 0 }}
+                </p>
+
+                <p class="text-sm text-gray-600 mt-2">
+                    Requieren atención inmediata
+                </p>
+            </div>
+
+            <div class="bg-green-100 shadow rounded p-6">
+                <h3 class="text-green-700 font-semibold mb-3">
+                    Promedio respuesta por agente (min)
+                </h3>
+
+                {% if metrics.response_times %}
+                    {% for agent in metrics.response_times %}
+                        <div class="flex justify-between border-b py-1">
+                            <span class="font-medium">
+                                {{ agent[0] }}
+                            </span>
+                            <span class="font-bold">
+                                {{ agent[1] | round(1) }} min
+                            </span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-600">
+                        Sin datos aún
+                    </p>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        <!-- GRÁFICAS -->
         <div class="grid grid-cols-2 gap-8 mb-8">
 
             <div class="bg-white shadow rounded p-6">
@@ -110,7 +161,7 @@
 
         {% endif %}
 
-        <!-- Leads Table -->
+        <!-- TABLA DE LEADS -->
         <div class="bg-white shadow rounded p-6">
             <h2 class="text-xl font-semibold mb-4 text-blue-900">
                 Leads
@@ -121,38 +172,65 @@
                     <tr class="border-b">
                         <th class="py-2">Nombre</th>
                         <th>Score</th>
+                        <th>Prioridad</th>
                         <th>Teléfono</th>
                         <th>Estado</th>
-                        <th>Actualizar</th>
+                        <th>Acción</th>
                     </tr>
                 </thead>
-                <tbody>
 
+                <tbody>
                 {% for lead in leads %}
                 <tr class="border-b">
-                    <td class="py-2">{{ lead[1] }}</td>
-                    <td>{{ lead[4] }}</td>
-                    <td>{{ lead[5] }}</td>
-                    <td>{{ lead[7] }}</td>
-                    <td>
-                        <form method="POST" action="/update_status">
-                            <input type="hidden" name="lead_id" value="{{ lead[0] }}">
-                            <select name="status" class="border rounded px-2 py-1">
-                                {% for status in status_options %}
-                                <option value="{{ status }}" {% if status == lead[7] %}selected{% endif %}>
-                                    {{ status }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <button class="bg-blue-900 text-white px-3 py-1 rounded">
-                                Guardar
-                            </button>
-                        </form>
+
+                    <td class="py-2 font-semibold">
+                        {{ lead[1] }}
                     </td>
+
+                    <!-- SCORE CON COLOR -->
+                    <td>
+                        {% set score = lead[14] or 0 %}
+
+                        {% if score >= 85 %}
+                            <span class="bg-red-600 text-white px-2 py-1 rounded">
+                                🔥 {{ score }}
+                            </span>
+                        {% elif score >= 70 %}
+                            <span class="bg-yellow-500 text-white px-2 py-1 rounded">
+                                🟡 {{ score }}
+                            </span>
+                        {% else %}
+                            <span class="bg-blue-600 text-white px-2 py-1 rounded">
+                                🔵 {{ score }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- PRIORITY -->
+                    <td>
+                        {% if lead[15] == "Caliente" %}
+                            <span class="text-red-600 font-bold">🔥 Caliente</span>
+                        {% elif lead[15] == "Medio" %}
+                            <span class="text-yellow-600 font-bold">🟡 Medio</span>
+                        {% else %}
+                            <span class="text-blue-600 font-bold">🔵 Frío</span>
+                        {% endif %}
+                    </td>
+
+                    <td>{{ lead[10] }}</td>
+                    <td>{{ lead[12] }}</td>
+
+                    <td>
+                        <a href="/lead/{{ lead[0] }}"
+                           class="bg-blue-900 text-white px-3 py-1 rounded">
+                            Ver
+                        </a>
+                    </td>
+
                 </tr>
                 {% endfor %}
-
                 </tbody>
+
             </table>
         </div>
 

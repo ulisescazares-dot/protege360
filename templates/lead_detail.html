@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Detalle Lead</title>
+</head>
+
+<body class="bg-gray-100 min-h-screen p-8">
+
+<div class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-8">
+
+    <h1 class="text-3xl font-bold text-blue-900 mb-6">
+        Ficha del Lead
+    </h1>
+
+    <!-- INFORMACIÓN GENERAL -->
+    <div class="mb-8">
+        <h2 class="text-xl font-semibold text-blue-900 mb-4">
+            Información General
+        </h2>
+
+        <div class="grid grid-cols-2 gap-4">
+            <p><strong>Nombre:</strong> {{ lead[1] }}</p>
+            <p><strong>Edad:</strong> {{ lead[2] }}</p>
+            <p><strong>Producto:</strong> {{ lead[3] }}</p>
+            <p><strong>Teléfono:</strong> {{ lead[10] }}</p>
+            <p><strong>Fecha:</strong> {{ lead[11] }}</p>
+            <p><strong>Agente:</strong> {{ lead[13] }}</p>
+        </div>
+    </div>
+
+    <!-- INFORMACIÓN DE COTIZACIÓN -->
+    <div class="mb-8">
+        <h2 class="text-xl font-semibold text-blue-900 mb-4">
+            Información para Cotización
+        </h2>
+
+        {% if "Gastos Médicos" in lead[3] %}
+            <p><strong>Fuma:</strong> {{ lead[4] }}</p>
+            <p><strong>Frecuencia de Pago:</strong> {{ lead[5] }}</p>
+            <p><strong>Presupuesto Mensual:</strong> {{ lead[6] }}</p>
+        {% else %}
+            <p><strong>Edad de Retiro:</strong> {{ lead[7] }}</p>
+            <p><strong>Dependientes:</strong> {{ lead[8] }}</p>
+            <p><strong>Meta de Retiro:</strong> {{ lead[9] }}</p>
+            <p><strong>Presupuesto Mensual:</strong> {{ lead[6] }}</p>
+        {% endif %}
+    </div>
+
+    <!-- ACCIÓN COMERCIAL -->
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold text-blue-900 mb-4">
+            Acción Comercial
+        </h2>
+
+        <form method="POST" action="/update_status">
+            <input type="hidden" name="lead_id" value="{{ lead[0] }}">
+
+            <select name="status"
+                    class="border rounded px-3 py-2 mr-4">
+                {% for status in status_options %}
+                <option value="{{ status }}"
+                    {% if status == lead[12] %}selected{% endif %}>
+                    {{ status }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <button class="bg-blue-900 text-white px-4 py-2 rounded">
+                Guardar Estado
+            </button>
+        </form>
+
+        <div class="mt-4">
+            <a href="https://wa.me/52{{ lead[10] }}"
+               target="_blank"
+               class="bg-green-600 text-white px-4 py-2 rounded">
+               Contactar por WhatsApp
+            </a>
+        </div>
+    </div>
+
+    <a href="/dashboard"
+       class="text-blue-900 underline">
+       ← Volver al Dashboard
+    </a>
+
+</div>
+
+</body>
+</html>
