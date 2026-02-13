@@ -155,19 +155,19 @@ def chat():
         state["level"] = "monthly_budget"
 
     elif state["level"] == "monthly_budget":
-    state["data"]["monthly_budget"] = message
+        state["data"]["monthly_budget"] = message
 
-    if "Seguro de Vida" in state["data"].get("product_type", ""):
-        reply = "¿Con cuánto te gustaría retirarte?"
-        state["level"] = "retirement_goal"
-    else:
-        reply = "Perfecto. Ahora te mostraré un resumen."
-        state["level"] = "summary"
-
+        if "Seguro de Vida" in state["data"].get("product_type", ""):
+            reply = "¿Con cuánto te gustaría retirarte?"
+            state["level"] = "retirement_goal"
+        else:
+            reply = "Perfecto. Ahora te mostraré un resumen."
+            state["level"] = "summary"
 
     elif state["level"] == "retirement_goal":
         state["data"]["retirement_goal"] = message
         state["level"] = "summary"
+
 
     # -------- RESUMEN --------
     elif state["level"] == "summary":
