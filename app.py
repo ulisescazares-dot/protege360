@@ -1,26 +1,29 @@
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import sqlite3
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key"
-
-AGENTS = ["Ana", "Luis", "Marco"]
-agent_index = 0
-
-STATUS_OPTIONS = ["Nuevo", "Contactado", "Cotizado", "Cerrado", "Perdido"]
+app.secret_key = "supersecretkey"
 
 # -------------------------
-# DATABASE SETUP
+# CONFIGURACIÓN
+# -------------------------
+
+AGENTS = ["agent1", "agent2", "agent3"]
+STATUS_OPTIONS = ["Nuevo", "Contactado", "Cotizado", "Cerrado"]
+
+agent_index = 0
+
+# -------------------------
+# BASE DE DATOS
 # -------------------------
 
 def init_db():
-    def init_db():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
-    # ===== TABLA LEADS NUEVA =====
+    # ===== TABLA LEADS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS leads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +53,7 @@ def init_db():
         )
     """)
 
-    # ===== CREAR DIRECTOR =====
+    # Crear director si no existe
     cursor.execute("SELECT * FROM users WHERE username = ?", ("director",))
     if not cursor.fetchone():
         cursor.execute("""
@@ -58,7 +61,7 @@ def init_db():
             VALUES (?, ?, ?)
         """, ("director", generate_password_hash("1234"), "director"))
 
-    # ===== CREAR AGENTES =====
+    # Crear agentes si no existen
     for agent in AGENTS:
         cursor.execute("SELECT * FROM users WHERE username = ?", (agent,))
         if not cursor.fetchone():
@@ -70,11 +73,10 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 init_db()
 
 # -------------------------
-# ROTACIÓN AGENTES
+# ROTACIÓN DE AGENTES
 # -------------------------
 
 def get_next_agent():
@@ -84,12 +86,16 @@ def get_next_agent():
     return agent
 
 # -------------------------
-# CHAT
+# RUTA PRINCIPAL
 # -------------------------
 
 @app.route("/")
 def home():
     return render_template("chat.html")
+
+# -------------------------
+# CHAT INTELIGENTE
+# -------------------------
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -100,117 +106,107 @@ def chat():
     reply = ""
     options = []
 
-    # ================= START =================
+    # START
     if state["level"] == "start":
-        reply = ("Hola 👋\n\n"
-                 "Soy el asistente digital de protección financiera.\n"
-                 "En menos de 3 minutos puedo ayudarte a identificar la estrategia adecuada para ti.\n\n"
-                 "Para comenzar, ¿cuántos años tienes?")
+        reply = "Hola 👋\n\n¿Cuántos años tienes?"
         state["level"] = "age"
 
-    # ================= AGE =================
     elif state["level"] == "age":
         try:
-            age = int(message)
-            state["data"]["age"] = age
-            reply = "¿Hay personas que dependan económicamente de ti?"
-            options = ["Sí", "No"]
-            state["level"] = "dependents"
+            state["data"]["age"] = int(message)
+            reply = "¿Qué estás buscando?"
+            options = ["Gastos Médicos (MedicaLife)", "Seguro de Vida (MetaLife)"]
+            state["level"] = "product_type"
         except:
-            reply = "Por favor ingresa tu edad en números."
+            reply = "Por favor escribe tu edad en números."
 
-    # ================= DEPENDENTS =================
-    elif state["level"] == "dependents":
-        state["data"]["dependents"] = message
-        reply = "¿Qué te preocupa más actualmente?"
-        options = [
-            "Proteger a mi familia",
-            "Gastos médicos",
-            "Ambas",
-            "No estoy seguro"
-        ]
-        state["level"] = "priority"
+    elif state["level"] == "product_type":
+        state["data"]["product_type"] = message
 
-    # ================= PRIORITY =================
-    elif state["level"] == "priority":
-        state["data"]["priority"] = message
-        reply = ("De manera aproximada, ¿qué monto mensual estarías dispuesto a invertir en tu protección?")
-        options = [
-            "$1,500 – $2,500",
-            "$2,500 – $4,000",
-            "$4,000 – $7,000",
-            "Más de $7,000"
-        ]
-        state["level"] = "budget"
-
-    # ================= BUDGET =================
-    elif state["level"] == "budget":
-        state["data"]["budget"] = message
-
-        dependents = state["data"]["dependents"]
-        priority = state["data"]["priority"]
-
-        if priority == "Proteger a mi familia":
-            product = "MetaLife"
-        elif priority == "Gastos médicos":
-            product = "MedicaLife"
-        elif priority == "Ambas":
-            product = "MetaLife + MedicaLife"
+        if "Gastos Médicos" in message:
+            reply = "¿Fumas?"
+            options = ["Sí", "No"]
+            state["level"] = "smoker"
         else:
-            if dependents == "Sí":
-                product = "MetaLife"
-            else:
-                product = "MedicaLife"
+            reply = "¿A qué edad te gustaría retirarte?"
+            state["level"] = "retirement_age"
 
-        state["data"]["recommended_product"] = product
+    # -------- GMM --------
+    elif state["level"] == "smoker":
+        state["data"]["smoker"] = message
+        reply = "¿Cómo prefieres pagar tu plan?"
+        options = ["Mensual", "Trimestral", "Semestral", "Anual"]
+        state["level"] = "payment_frequency"
 
-        reply = (f"Resultado de Evaluación:\n\n"
-                 f"Producto Recomendado: {product}\n\n"
-                 "Con base en tu perfil y el monto que deseas invertir, "
-                 "existe una estrategia de protección adecuada para ti.\n\n"
-                 "¿Cómo prefieres continuar?")
+    elif state["level"] == "payment_frequency":
+        state["data"]["payment_frequency"] = message
+        reply = "¿Cuánto podrías invertir al mes?"
+        options = ["$1,500 – $2,500", "$2,500 – $4,000", "$4,000 – $7,000", "Más de $7,000"]
+        state["level"] = "monthly_budget"
 
-        options = [
-            "Quiero que me contacten",
-            {
-                "label": "Contactar ahora por WhatsApp",
-                "url": "https://wa.me/5216646346643"
-            }
-        ]
+    # -------- VIDA --------
+    elif state["level"] == "retirement_age":
+        state["data"]["retirement_age"] = message
+        reply = "¿Cuántas personas dependen de ti?"
+        state["level"] = "dependents_count"
 
-        state["level"] = "decision"
+    elif state["level"] == "dependents_count":
+        state["data"]["dependents_count"] = message
+        reply = "¿Cuánto te gustaría invertir al mes?"
+        options = ["$1,500 – $2,500", "$2,500 – $4,000", "$4,000 – $7,000", "Más de $7,000"]
+        state["level"] = "monthly_budget"
 
-    # ================= DECISION =================
-    elif state["level"] == "decision":
+    elif state["level"] == "monthly_budget":
+        state["data"]["monthly_budget"] = message
 
-        if message == "Quiero que me contacten":
-            reply = "Perfecto. Por favor escribe tu nombre completo."
-            state["level"] = "name"
+        if "Seguro de Vida" in state["data"]["product_type"]:
+            reply = "¿Con cuánto te gustaría retirarte?"
+            state["level"] = "retirement_goal"
+        else:
+            state["level"] = "summary"
 
-    # ================= NAME =================
+    elif state["level"] == "retirement_goal":
+        state["data"]["retirement_goal"] = message
+        state["level"] = "summary"
+
+    # -------- RESUMEN --------
+    elif state["level"] == "summary":
+        summary = "Resumen de tu perfil:\n\n"
+        for k, v in state["data"].items():
+            summary += f"{k.replace('_',' ').title()}: {v}\n"
+
+        reply = summary + "\nPor favor escribe tu nombre completo."
+        state["level"] = "name"
+
     elif state["level"] == "name":
         state["data"]["name"] = message
-        reply = "Ahora escribe tu número de WhatsApp para que podamos contactarte."
+        reply = "Escribe tu número de WhatsApp."
         state["level"] = "phone"
 
-    # ================= PHONE =================
     elif state["level"] == "phone":
         state["data"]["phone"] = message
-
         assigned_agent = get_next_agent()
 
         conn = sqlite3.connect("database.db")
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT INTO leads (name, age, children, score, phone, created_at, status, agent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO leads (
+                name, age, product_type, smoker, payment_frequency,
+                monthly_budget, retirement_age, dependents_count,
+                retirement_goal, phone, created_at, status, agent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            state["data"]["name"],
-            state["data"].get("age", 0),
-            state["data"].get("dependents", ""),
-            0,
-            state["data"]["phone"],
+            state["data"].get("name"),
+            state["data"].get("age"),
+            state["data"].get("product_type"),
+            state["data"].get("smoker"),
+            state["data"].get("payment_frequency"),
+            state["data"].get("monthly_budget"),
+            state["data"].get("retirement_age"),
+            state["data"].get("dependents_count"),
+            state["data"].get("retirement_goal"),
+            state["data"].get("phone"),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Nuevo",
             assigned_agent
@@ -219,21 +215,13 @@ def chat():
         conn.commit()
         conn.close()
 
-        reply = ("Gracias.\n\n"
-                 "Tu información ha sido enviada correctamente.\n"
-                 "Un asesor se pondrá en contacto contigo en breve.")
-
+        reply = "Gracias. Un asesor se pondrá en contacto contigo."
         state["level"] = "closed"
 
-    return jsonify({
-        "reply": reply,
-        "options": options,
-        "state": state
-    })
-
+    return jsonify({"reply": reply, "options": options, "state": state})
 
 # -------------------------
-# LOGIN (SEGURO)
+# LOGIN
 # -------------------------
 
 @app.route("/login", methods=["GET", "POST"])
