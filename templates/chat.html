@@ -40,16 +40,37 @@
 <script>
 
 let state = {"level": "start", "data": {}};
+let loadingMessage = null;
 
 function addMessage(text, sender) {
     const div = document.createElement("div");
+
     div.className = sender === "bot"
-        ? "bg-blue-100 text-blue-900 p-3 rounded-lg w-fit max-w-xs"
-        : "bg-blue-900 text-white p-3 rounded-lg w-fit max-w-xs ml-auto";
+        ? "bg-blue-100 text-blue-900 p-3 rounded-lg w-fit max-w-xs whitespace-pre-line"
+        : "bg-blue-900 text-white p-3 rounded-lg w-fit max-w-xs ml-auto whitespace-pre-line";
 
     div.innerText = text;
     document.getElementById("messages").appendChild(div);
-    div.scrollIntoView();
+    div.scrollIntoView({behavior: "smooth"});
+}
+
+function showLoading() {
+    loadingMessage = document.createElement("div");
+    loadingMessage.className = "bg-gray-200 text-gray-600 p-2 rounded-lg w-fit max-w-xs";
+    loadingMessage.innerText = "Escribiendo...";
+    document.getElementById("messages").appendChild(loadingMessage);
+}
+
+function removeLoading() {
+    if (loadingMessage) {
+        loadingMessage.remove();
+        loadingMessage = null;
+    }
+}
+
+function clearButtons() {
+    const buttons = document.querySelectorAll(".option-btn");
+    buttons.forEach(btn => btn.remove());
 }
 
 function sendMessage(textOverride = null) {
@@ -61,6 +82,9 @@ function sendMessage(textOverride = null) {
     addMessage(message, "user");
     input.value = "";
 
+    clearButtons();
+    showLoading();
+
     fetch("/chat", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -69,49 +93,72 @@ function sendMessage(textOverride = null) {
             state: state
         })
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Error en el servidor");
+        }
+        return res.json();
+    })
     .then(data => {
+
+        removeLoading();
         state = data.state;
         addMessage(data.reply, "bot");
 
-        const messagesDiv = document.getElementById("messages");
-
         if (data.options && data.options.length > 0) {
+
             data.options.forEach(opt => {
 
                 const btn = document.createElement("button");
-                btn.className = "block w-full mt-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800";
+                btn.className = "option-btn block w-full mt-2 bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800";
 
                 if (typeof opt === "string") {
                     btn.innerText = opt;
                     btn.onclick = () => sendMessage(opt);
-                } else if (opt.url) {
+                } 
+                else if (opt.url) {
                     btn.innerText = opt.label;
                     btn.onclick = () => window.open(opt.url, "_blank");
                 }
 
-                messagesDiv.appendChild(btn);
+                document.getElementById("messages").appendChild(btn);
             });
         }
+
+    })
+    .catch(error => {
+        removeLoading();
+        addMessage("Ocurrió un error. Intenta nuevamente.", "bot");
+        console.error("Error:", error);
     });
 }
 
 // Auto start
-fetch("/chat", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-        message: "",
-        state: state
-    })
-})
-.then(res => res.json())
-.then(data => {
-    state = data.state;
-    addMessage(data.reply, "bot");
-});
+window.onload = function() {
+    showLoading();
 
-</script>
+    fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            message: "",
+            state: state
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        removeLoading();
+        state = data.state;
+        addMessage(data.reply, "bot");
+    })
+    .catch(error => {
+        removeLoading();
+        addMessage("No se pudo iniciar el chat.", "bot");
+    });
+};
+
+</script
+
 
 </body>
 </html>
