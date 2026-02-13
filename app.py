@@ -16,16 +16,23 @@ STATUS_OPTIONS = ["Nuevo", "Contactado", "Cotizado", "Cerrado", "Perdido"]
 # -------------------------
 
 def init_db():
+    def init_db():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
+    # ===== TABLA LEADS NUEVA =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS leads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             age INTEGER,
-            children TEXT,
-            score INTEGER,
+            product_type TEXT,
+            smoker TEXT,
+            payment_frequency TEXT,
+            monthly_budget TEXT,
+            retirement_age TEXT,
+            dependents_count TEXT,
+            retirement_goal TEXT,
             phone TEXT,
             created_at TEXT,
             status TEXT,
@@ -33,6 +40,7 @@ def init_db():
         )
     """)
 
+    # ===== TABLA USERS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +50,7 @@ def init_db():
         )
     """)
 
-    # Crear director si no existe
+    # ===== CREAR DIRECTOR =====
     cursor.execute("SELECT * FROM users WHERE username = ?", ("director",))
     if not cursor.fetchone():
         cursor.execute("""
@@ -50,7 +58,7 @@ def init_db():
             VALUES (?, ?, ?)
         """, ("director", generate_password_hash("1234"), "director"))
 
-    # Crear agentes si no existen
+    # ===== CREAR AGENTES =====
     for agent in AGENTS:
         cursor.execute("SELECT * FROM users WHERE username = ?", (agent,))
         if not cursor.fetchone():
@@ -61,6 +69,7 @@ def init_db():
 
     conn.commit()
     conn.close()
+
 
 init_db()
 
