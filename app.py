@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
 import sqlite3
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -257,6 +258,13 @@ def chat():
         state["level"] = "closed"
 
     return jsonify({"reply": reply, "options": options, "state": state})
+
+
+
+@app.route("/manifest.json")
+def manifest():
+    return send_from_directory(".", "manifest.json")
+
 
 # =============================
 # LOGIN
