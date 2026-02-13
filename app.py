@@ -23,7 +23,6 @@ def init_db():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
-    # ===== TABLA LEADS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS leads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +42,6 @@ def init_db():
         )
     """)
 
-    # ===== TABLA USERS =====
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +51,6 @@ def init_db():
         )
     """)
 
-    # Crear director si no existe
     cursor.execute("SELECT * FROM users WHERE username = ?", ("director",))
     if not cursor.fetchone():
         cursor.execute("""
@@ -61,7 +58,6 @@ def init_db():
             VALUES (?, ?, ?)
         """, ("director", generate_password_hash("1234"), "director"))
 
-    # Crear agentes si no existen
     for agent in AGENTS:
         cursor.execute("SELECT * FROM users WHERE username = ?", (agent,))
         if not cursor.fetchone():
@@ -73,7 +69,9 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 # -------------------------
 # ROTACIÓN DE AGENTES
