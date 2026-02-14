@@ -221,7 +221,7 @@
                     <td>{{ lead[12] }}</td>
 
                     <td>
-                        <a href="/lead/{{ lead[0] }}"
+                        <a href="{{ url_for('lead_detail', lead_id=lead[0]) }}">
                            class="bg-blue-900 text-white px-3 py-1 rounded">
                             Ver
                         </a>
