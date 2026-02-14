@@ -264,6 +264,7 @@ def login():
 
 @app.route("/dashboard")
 def dashboard():
+
     if "username" not in session:
         return redirect(url_for("login"))
 
@@ -271,6 +272,7 @@ def dashboard():
     cursor = conn.cursor()
 
     metrics = None
+    leads = []
 
     if session["role"] == "director":
 
@@ -327,6 +329,82 @@ def dashboard():
         """)
         response_times = cursor.fetchall()
 
+        # =========================
+        # RANKING MENSUAL
+        # =========================
+
+        cursor.execute("""
+            SELECT 
+                agent,
+                COUNT(*) as total_mes,
+                SUM(CASE WHEN status = 'Cerrado' THEN 1 ELSE 0 END) as cerrados_mes
+            FROM leads
+            WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+            GROUP BY agent
+        """)
+
+        ranking_mes_raw = cursor.fetchall()
+        ranking_mes = []
+
+        for row in ranking_mes_raw:
+            agent = row[0]
+            total_mes = row[1]
+            cerrados_mes = row[2] or 0
+
+            tasa = round((cerrados_mes / total_mes) * 100, 2) if total_mes > 0 else 0
+
+            ranking_mes.append({
+                "agent": agent,
+                "total": total_mes,
+                "cerrados": cerrados_mes,
+                "tasa": tasa
+            })
+
+        ranking_mes = sorted(
+            ranking_mes,
+            key=lambda x: (x["cerrados"], x["tasa"]),
+            reverse=True
+        )
+
+        # =========================
+        # RANKING HISTÓRICO
+        # =========================
+
+        cursor.execute("""
+            SELECT 
+                agent,
+                COUNT(*) as total_hist,
+                SUM(CASE WHEN status = 'Cerrado' THEN 1 ELSE 0 END) as cerrados_hist,
+                AVG(first_response_minutes)
+            FROM leads
+            GROUP BY agent
+        """)
+
+        ranking_hist_raw = cursor.fetchall()
+        ranking_hist = []
+
+        for row in ranking_hist_raw:
+            agent = row[0]
+            total_hist = row[1]
+            cerrados_hist = row[2] or 0
+            avg_resp = round(row[3], 1) if row[3] else 0
+
+            tasa_hist = round((cerrados_hist / total_hist) * 100, 2) if total_hist > 0 else 0
+
+            ranking_hist.append({
+                "agent": agent,
+                "total": total_hist,
+                "cerrados": cerrados_hist,
+                "tasa": tasa_hist,
+                "avg_resp": avg_resp
+            })
+
+        ranking_hist = sorted(
+            ranking_hist,
+            key=lambda x: (x["cerrados"], x["tasa"]),
+            reverse=True
+        )
+
         metrics = {
             "total": total,
             "closed": closed,
@@ -334,7 +412,9 @@ def dashboard():
             "by_agent": by_agent,
             "by_status": by_status,
             "overdue": overdue,
-            "response_times": response_times
+            "response_times": response_times,
+            "ranking_mes": ranking_mes,
+            "ranking_hist": ranking_hist
         }
 
     else:
@@ -356,6 +436,148 @@ def dashboard():
         status_options=STATUS_OPTIONS,
         metrics=metrics
     )
+
+    # Leads ordenados
+    cursor.execute("SELECT * FROM leads ORDER BY score DESC, created_at DESC")
+    leads = cursor.fetchall()
+
+    # Totales
+    cursor.execute("SELECT COUNT(*) FROM leads")
+    total = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM leads WHERE status = 'Cerrado'")
+    closed = cursor.fetchone()[0]
+
+    close_rate = round((closed / total) * 100, 2) if total > 0 else 0
+
+    # Por agente
+    cursor.execute("""
+        SELECT agent, COUNT(*)
+        FROM leads
+        GROUP BY agent
+    """)
+    by_agent = cursor.fetchall()
+
+    # Por estado
+    cursor.execute("""
+        SELECT status, COUNT(*)
+        FROM leads
+        GROUP BY status
+    """)
+    by_status = cursor.fetchall()
+
+    # 🚨 Leads nuevos > 2h
+    cursor.execute("""
+        SELECT created_at
+        FROM leads
+        WHERE status = 'Nuevo'
+    """)
+    new_leads = cursor.fetchall()
+
+    overdue = 0
+    now = datetime.now()
+
+    for row in new_leads:
+        if row[0] and now - row[0] > timedelta(hours=2):
+            overdue += 1
+
+    # ⏱ Promedio respuesta
+    cursor.execute("""
+        SELECT agent, AVG(first_response_minutes)
+        FROM leads
+        WHERE first_response_minutes IS NOT NULL
+        GROUP BY agent
+    """)
+    response_times = cursor.fetchall()
+
+    # =========================
+    # RANKING MENSUAL
+    # =========================
+
+    cursor.execute("""
+        SELECT 
+            agent,
+            COUNT(*) as total_mes,
+            SUM(CASE WHEN status = 'Cerrado' THEN 1 ELSE 0 END) as cerrados_mes
+        FROM leads
+        WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+        GROUP BY agent
+    """)
+
+    ranking_mes_raw = cursor.fetchall()
+    ranking_mes = []
+
+    for row in ranking_mes_raw:
+        agent = row[0]
+        total_mes = row[1]
+        cerrados_mes = row[2] or 0
+
+        tasa = round((cerrados_mes / total_mes) * 100, 2) if total_mes > 0 else 0
+
+        ranking_mes.append({
+            "agent": agent,
+            "total": total_mes,
+            "cerrados": cerrados_mes,
+            "tasa": tasa
+        })
+
+    ranking_mes = sorted(
+        ranking_mes,
+        key=lambda x: (x["cerrados"], x["tasa"]),
+        reverse=True
+    )
+
+    # =========================
+    # RANKING HISTÓRICO
+    # =========================
+
+    cursor.execute("""
+        SELECT 
+            agent,
+            COUNT(*) as total_hist,
+            SUM(CASE WHEN status = 'Cerrado' THEN 1 ELSE 0 END) as cerrados_hist,
+            AVG(first_response_minutes)
+        FROM leads
+        GROUP BY agent
+    """)
+
+    ranking_hist_raw = cursor.fetchall()
+    ranking_hist = []
+
+    for row in ranking_hist_raw:
+        agent = row[0]
+        total_hist = row[1]
+        cerrados_hist = row[2] or 0
+        avg_resp = round(row[3], 1) if row[3] else 0
+
+        tasa_hist = round((cerrados_hist / total_hist) * 100, 2) if total_hist > 0 else 0
+
+        ranking_hist.append({
+            "agent": agent,
+            "total": total_hist,
+            "cerrados": cerrados_hist,
+            "tasa": tasa_hist,
+            "avg_resp": avg_resp
+        })
+
+    ranking_hist = sorted(
+        ranking_hist,
+        key=lambda x: (x["cerrados"], x["tasa"]),
+        reverse=True
+    )
+
+    metrics = {
+        "total": total,
+        "closed": closed,
+        "close_rate": close_rate,
+        "by_agent": by_agent,
+        "by_status": by_status,
+        "overdue": overdue,
+        "response_times": response_times,
+        "ranking_mes": ranking_mes,
+        "ranking_hist": ranking_hist
+    }
+
 
 @app.route("/lead/<int:lead_id>")
 def lead_detail(lead_id):
