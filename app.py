@@ -357,6 +357,41 @@ def dashboard():
         metrics=metrics
     )
 
+@app.route("/lead/<int:lead_id>")
+def lead_detail(lead_id):
+
+    if "username" not in session:
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if session["role"] == "director":
+        cursor.execute(
+            "SELECT * FROM leads WHERE id = %s",
+            (lead_id,)
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM leads WHERE id = %s AND agent = %s",
+            (lead_id, session["username"])
+        )
+
+    lead = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if not lead:
+        return "Lead no encontrado"
+
+    return render_template(
+        "lead_detail.html",
+        lead=lead,
+        role=session["role"],
+        username=session["username"],
+        status_options=STATUS_OPTIONS
+    )
 
 # =========================
 
