@@ -1,67 +1,69 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import psycopg2
 import os
+import random
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# =============================
-# CONFIGURACIÓN
-# =============================
-
-DATABASE_URL = os.environ.get("DATABASE_URL")
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
 AGENTS = ["agent1", "agent2", "agent3"]
 STATUS_OPTIONS = ["Nuevo", "Contactado", "Cotizado", "Cerrado"]
 
-agent_index = 0
+# =========================
+# CONEXIÓN DB
+# =========================
 
-# =============================
-# BASE DE DATOS
-# =============================
-
-def get_db_connection():
+def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
+# =========================
+# INIT DB (POSTGRES)
+# =========================
+
 def init_db():
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS leads (
-            id SERIAL PRIMARY KEY,
-            name TEXT,
-            age INTEGER,
-            product_type TEXT,
-            smoker TEXT,
-            payment_frequency TEXT,
-            monthly_budget TEXT,
-            retirement_age TEXT,
-            dependents_count TEXT,
-            retirement_goal TEXT,
-            phone TEXT,
-            created_at TIMESTAMP,
-            status TEXT,
-            agent TEXT,
-            score INTEGER,
-            priority TEXT,
-            contacted_at TIMESTAMP,
-            first_response_minutes INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS leads (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        age INTEGER,
+        product_type TEXT,
+        smoker TEXT,
+        payment_frequency TEXT,
+        monthly_budget TEXT,
+        retirement_age TEXT,
+        dependents_count TEXT,
+        retirement_goal TEXT,
+        phone TEXT,
+        created_at TIMESTAMP,
+        status TEXT,
+        agent TEXT,
+        score INTEGER,
+        priority TEXT,
+        contacted_at TIMESTAMP,
+        first_response_minutes INTEGER
+    );
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE,
-            password TEXT,
-            role TEXT
-        )
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password TEXT,
+        role TEXT
+    );
     """)
 
-    # Crear director si no existe
+    # Crear director
     cursor.execute("SELECT * FROM users WHERE username = %s", ("director",))
     if not cursor.fetchone():
         cursor.execute(
@@ -69,7 +71,7 @@ def init_db():
             ("director", generate_password_hash("1234"), "director")
         )
 
-    # Crear agentes si no existen
+    # Crear agentes
     for agent in AGENTS:
         cursor.execute("SELECT * FROM users WHERE username = %s", (agent,))
         if not cursor.fetchone():
@@ -79,26 +81,16 @@ def init_db():
             )
 
     conn.commit()
-    cursor.close()
     conn.close()
 
 init_db()
 
-# =============================
-# UTILIDADES
-# =============================
-
-def get_next_agent():
-    global agent_index
-    agent = AGENTS[agent_index % len(AGENTS)]
-    agent_index += 1
-    return agent
+# =========================
+# LÓGICA SCORE
+# =========================
 
 def calculate_score(data):
     budget = data.get("monthly_budget", "")
-    product = data.get("product_type", "")
-    dependents = data.get("dependents_count", "")
-
     score = 0
 
     if "Más de $7,000" in budget:
@@ -110,10 +102,10 @@ def calculate_score(data):
     elif "$1,500" in budget:
         score = 45
 
-    if "Seguro de Vida" in product:
+    if "Seguro de Vida" in data.get("product_type", ""):
         score += 10
 
-    if dependents and dependents != "0":
+    if data.get("dependents_count") and data.get("dependents_count") != "0":
         score += 5
 
     return min(score, 100)
@@ -126,9 +118,9 @@ def classify_lead(score):
     else:
         return "Bajo"
 
-# =============================
+# =========================
 # CHAT
-# =============================
+# =========================
 
 @app.route("/")
 def home():
@@ -169,27 +161,31 @@ def chat():
 
     elif state["level"] == "smoker":
         state["data"]["smoker"] = message
-        reply = "¿Cuánto puedes invertir al mes?"
+        reply = "¿Cuánto podrías invertir al mes?"
         options = ["$1,500 – $2,500", "$2,500 – $4,000", "$4,000 – $7,000", "Más de $7,000"]
         state["level"] = "monthly_budget"
 
     elif state["level"] == "dependents_count":
         state["data"]["dependents_count"] = message
-        reply = "¿Cuánto puedes invertir al mes?"
+        reply = "¿Cuánto te gustaría invertir al mes?"
         options = ["$1,500 – $2,500", "$2,500 – $4,000", "$4,000 – $7,000", "Más de $7,000"]
         state["level"] = "monthly_budget"
 
     elif state["level"] == "monthly_budget":
         state["data"]["monthly_budget"] = message
+        reply = "Presiona generar resumen para continuar."
+        options = ["Generar resumen"]
+        state["level"] = "awaiting_summary"
 
-        score = calculate_score(state["data"])
-        priority = classify_lead(score)
-
-        state["data"]["score"] = score
-        state["data"]["priority"] = priority
-
-        reply = f"Resumen:\nScore: {score}\nPrioridad: {priority}\n\nEscribe tu nombre completo."
-        state["level"] = "name"
+    elif state["level"] == "awaiting_summary":
+        if message == "Generar resumen":
+            summary = "\nResumen:\n\n"
+            for k, v in state["data"].items():
+                summary += f"{k}: {v}\n"
+            reply = summary + "\nEscribe tu nombre completo."
+            state["level"] = "name"
+        else:
+            reply = "Presiona el botón."
 
     elif state["level"] == "name":
         state["data"]["name"] = message
@@ -199,16 +195,21 @@ def chat():
     elif state["level"] == "phone":
         state["data"]["phone"] = message
 
-        conn = get_db_connection()
+        assigned_agent = random.choice(AGENTS)
+
+        score = calculate_score(state["data"])
+        priority = classify_lead(score)
+
+        conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT INTO leads (
-                name, age, product_type, smoker, monthly_budget,
-                dependents_count, phone, created_at, status, agent,
-                score, priority
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO leads (
+            name, age, product_type, smoker,
+            monthly_budget, dependents_count,
+            phone, created_at, status,
+            agent, score, priority
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             state["data"].get("name"),
             state["data"].get("age"),
@@ -219,23 +220,81 @@ def chat():
             state["data"].get("phone"),
             datetime.now(),
             "Nuevo",
-            get_next_agent(),
-            state["data"].get("score"),
-            state["data"].get("priority")
+            assigned_agent,
+            score,
+            priority
         ))
 
         conn.commit()
-        cursor.close()
         conn.close()
 
-        reply = "Gracias. Un asesor te contactará pronto."
+        reply = "Gracias. Un asesor se pondrá en contacto contigo."
         state["level"] = "closed"
 
     return jsonify({"reply": reply, "options": options, "state": state})
 
-# =============================
-# SERVIDOR RENDER
-# =============================
+# =========================
+# LOGIN
+# =========================
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, password, role FROM users WHERE username = %s", (username,))
+        user = cursor.fetchone()
+        conn.close()
+
+        if user and check_password_hash(user[1], password):
+            session["username"] = user[0]
+            session["role"] = user[2]
+            return redirect(url_for("dashboard"))
+        else:
+            return "Credenciales incorrectas"
+
+    return render_template("login.html")
+
+# =========================
+# DASHBOARD
+# =========================
+
+@app.route("/dashboard")
+def dashboard():
+    if "username" not in session:
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if session["role"] == "director":
+        cursor.execute("SELECT * FROM leads ORDER BY score DESC, created_at DESC")
+    else:
+        cursor.execute(
+            "SELECT * FROM leads WHERE agent = %s ORDER BY score DESC, created_at DESC",
+            (session["username"],)
+        )
+
+    leads = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        "dashboard.html",
+        leads=leads,
+        role=session["role"],
+        username=session["username"],
+        status_options=STATUS_OPTIONS
+    )
+
+# =========================
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
