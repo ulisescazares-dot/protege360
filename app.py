@@ -270,15 +270,82 @@ def dashboard():
     conn = get_connection()
     cursor = conn.cursor()
 
-    if session["role"] == "director":
-        cursor.execute("SELECT * FROM leads ORDER BY score DESC, created_at DESC")
-    else:
-        cursor.execute(
-            "SELECT * FROM leads WHERE agent = %s ORDER BY score DESC, created_at DESC",
-            (session["username"],)
-        )
+    metrics = None
 
-    leads = cursor.fetchall()
+    if session["role"] == "director":
+
+        # Leads ordenados
+        cursor.execute("SELECT * FROM leads ORDER BY score DESC, created_at DESC")
+        leads = cursor.fetchall()
+
+        # Totales
+        cursor.execute("SELECT COUNT(*) FROM leads")
+        total = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM leads WHERE status = 'Cerrado'")
+        closed = cursor.fetchone()[0]
+
+        close_rate = round((closed / total) * 100, 2) if total > 0 else 0
+
+        # Por agente
+        cursor.execute("""
+            SELECT agent, COUNT(*)
+            FROM leads
+            GROUP BY agent
+        """)
+        by_agent = cursor.fetchall()
+
+        # Por estado
+        cursor.execute("""
+            SELECT status, COUNT(*)
+            FROM leads
+            GROUP BY status
+        """)
+        by_status = cursor.fetchall()
+
+        # 🚨 Leads nuevos > 2h
+        cursor.execute("""
+            SELECT created_at
+            FROM leads
+            WHERE status = 'Nuevo'
+        """)
+        new_leads = cursor.fetchall()
+
+        overdue = 0
+        now = datetime.now()
+
+        for row in new_leads:
+            if row[0] and now - row[0] > timedelta(hours=2):
+                overdue += 1
+
+        # ⏱ Promedio respuesta
+        cursor.execute("""
+            SELECT agent, AVG(first_response_minutes)
+            FROM leads
+            WHERE first_response_minutes IS NOT NULL
+            GROUP BY agent
+        """)
+        response_times = cursor.fetchall()
+
+        metrics = {
+            "total": total,
+            "closed": closed,
+            "close_rate": close_rate,
+            "by_agent": by_agent,
+            "by_status": by_status,
+            "overdue": overdue,
+            "response_times": response_times
+        }
+
+    else:
+        cursor.execute("""
+            SELECT * FROM leads
+            WHERE agent = %s
+            ORDER BY score DESC, created_at DESC
+        """, (session["username"],))
+        leads = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -286,44 +353,10 @@ def dashboard():
         leads=leads,
         role=session["role"],
         username=session["username"],
-        status_options=STATUS_OPTIONS
+        status_options=STATUS_OPTIONS,
+        metrics=metrics
     )
 
-@app.route("/lead/<int:lead_id>")
-def lead_detail(lead_id):
-
-    if "username" not in session:
-        return redirect(url_for("login"))
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    if session["role"] == "director":
-        cursor.execute(
-            "SELECT * FROM leads WHERE id = %s",
-            (lead_id,)
-        )
-    else:
-        cursor.execute(
-            "SELECT * FROM leads WHERE id = %s AND agent = %s",
-            (lead_id, session["username"])
-        )
-
-    lead = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
-
-    if not lead:
-        return "Lead no encontrado"
-
-    return render_template(
-        "lead_detail.html",
-        lead=lead,
-        role=session["role"],
-        username=session["username"],
-        status_options=STATUS_OPTIONS
-    )
 
 # =========================
 
