@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
-import sqlite3
+import psycopg2
+import os
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
-
+DATABASE_URL = os.environ.get("DATABASE_URL")
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
@@ -16,8 +17,8 @@ agent_index = 0
 # BASE DE DATOS
 # =============================
 
-def init_db():
-    conn = sqlite3.connect("database.db")
+def get_db_connection():
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     cursor.execute("""
