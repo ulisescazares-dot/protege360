@@ -492,25 +492,25 @@ def dashboard():
             overdue_agent += 1
 
     # Promedio respuesta
-        cursor.execute("""
-            SELECT AVG(first_response_minutes)
-            FROM leads
-            WHERE agent = %s AND first_response_minutes IS NOT NULL
-        """, (session["username"],))
+    cursor.execute("""
+        SELECT AVG(first_response_minutes)
+        FROM leads
+         WHERE agent = %s AND first_response_minutes IS NOT NULL
+    """, (session["username"],))
 
-        avg_response = cursor.fetchone()[0]
-        avg_response = round(avg_response, 1) if avg_response else 0
+    avg_response = cursor.fetchone()[0]
+    avg_response = round(avg_response, 1) if avg_response else 0
 
-        metrics = {
-            "total_agent": total_agent,
-            "closed_agent": closed_agent,
-            "close_rate_agent": close_rate_agent,
-            "overdue_agent": overdue_agent,
-            "avg_response_agent": avg_response
+    metrics = {
+        "total_agent": total_agent,
+        "closed_agent": closed_agent,
+        "close_rate_agent": close_rate_agent,
+        "overdue_agent": overdue_agent,
+        "avg_response_agent": avg_response
     }
 
-        cursor.close()
-        conn.close()
+    cursor.close()
+    conn.close()
 
     return render_template(
         "dashboard.html",
