@@ -418,6 +418,7 @@ def dashboard():
         }
 
     else:
+    # Leads del agente
         cursor.execute("""
             SELECT * FROM leads
             WHERE agent = %s
@@ -425,8 +426,59 @@ def dashboard():
         """, (session["username"],))
         leads = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
+    # Total asignados
+        cursor.execute("""
+            SELECT COUNT(*) FROM leads
+            WHERE agent = %s
+        """, (session["username"],))
+        total_agent = cursor.fetchone()[0]
+
+    # Cerrados
+        cursor.execute("""
+            SELECT COUNT(*) FROM leads
+            WHERE agent = %s AND status = 'Cerrado'
+        """, (session["username"],))
+        closed_agent = cursor.fetchone()[0]
+
+    # Tasa de cierre
+        close_rate_agent = round(
+        (closed_agent / total_agent) * 100, 2
+    ) if total_agent > 0 else 0
+
+    # Leads nuevos > 2h
+        cursor.execute("""
+            SELECT created_at FROM leads
+            WHERE agent = %s AND status = 'Nuevo'
+        """, (session["username"],))
+
+        new_leads = cursor.fetchall()
+        overdue_agent = 0
+        now = datetime.now()
+
+    for row in new_leads:
+        if row[0] and now - row[0] > timedelta(hours=2):
+            overdue_agent += 1
+
+    # Promedio respuesta
+        cursor.execute("""
+            SELECT AVG(first_response_minutes)
+            FROM leads
+            WHERE agent = %s AND first_response_minutes IS NOT NULL
+        """, (session["username"],))
+
+        avg_response = cursor.fetchone()[0]
+        avg_response = round(avg_response, 1) if avg_response else 0
+
+        metrics = {
+            "total_agent": total_agent,
+            "closed_agent": closed_agent,
+            "close_rate_agent": close_rate_agent,
+            "overdue_agent": overdue_agent,
+            "avg_response_agent": avg_response
+    }
+
+        cursor.close()
+        conn.close()
 
     return render_template(
         "dashboard.html",

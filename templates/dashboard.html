@@ -26,6 +26,52 @@
         <h1 class="text-3xl font-bold text-blue-900 mb-6">
             Dashboard
         </h1>
+<h1 class="text-3xl font-bold text-blue-900 mb-6">
+    Dashboard
+</h1>
+
+{% if role == "agent" and metrics %}
+
+<div class="grid grid-cols-4 gap-6 mb-8">
+
+    <div class="bg-white shadow rounded p-6">
+        <h3 class="text-gray-500">Tus Leads</h3>
+        <p class="text-3xl font-bold text-blue-900">
+            {{ metrics.total_agent }}
+        </p>
+    </div>
+
+    <div class="bg-white shadow rounded p-6">
+        <h3 class="text-gray-500">Cerrados</h3>
+        <p class="text-3xl font-bold text-green-600">
+            {{ metrics.closed_agent }}
+        </p>
+    </div>
+
+    <div class="bg-white shadow rounded p-6">
+        <h3 class="text-gray-500">Tasa de Cierre</h3>
+        <p class="text-3xl font-bold text-blue-900">
+            {{ metrics.close_rate_agent }}%
+        </p>
+    </div>
+
+    <div class="bg-white shadow rounded p-6">
+        <h3 class="text-gray-500">Sin contactar +2h</h3>
+        <p class="text-3xl font-bold text-red-600">
+            {{ metrics.overdue_agent }}
+        </p>
+    </div>
+
+</div>
+
+<div class="bg-white shadow rounded p-6 mb-8">
+    <h3 class="text-gray-500 mb-2">Promedio Respuesta</h3>
+    <p class="text-2xl font-bold text-blue-900">
+        {{ metrics.avg_response_agent }} min
+    </p>
+</div>
+
+{% endif %}
 
         {% if role == "director" and metrics %}
 
