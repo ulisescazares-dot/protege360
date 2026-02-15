@@ -271,7 +271,7 @@ def dashboard():
     conn = get_connection()
     cursor = conn.cursor()
 
-    metrics = None
+    metrics = {}
     leads = []
 
     if session["role"] == "director":
@@ -454,6 +454,38 @@ def dashboard():
         new_leads = cursor.fetchall()
         overdue_agent = 0
         now = datetime.now()
+
+    total_agent = len(leads)
+
+    closed_agent = len([l for l in leads if l[12] == "Cerrado"])
+
+    close_rate_agent = round((closed_agent / total_agent) * 100, 2) if total_agent > 0 else 0
+
+    overdue_agent = 0
+    now = datetime.now()
+
+    for lead in leads:
+        if lead[12] == "Nuevo" and lead[11]:
+            if now - lead[11] > timedelta(hours=2):
+                overdue_agent += 1
+
+    cursor.execute("""
+        SELECT AVG(first_response_minutes)
+        FROM leads
+        WHERE agent = %s AND first_response_minutes IS NOT NULL
+    """, (session["username"],))
+
+    avg_resp = cursor.fetchone()[0]
+    avg_response_agent = round(avg_resp, 1) if avg_resp else 0
+
+    metrics = {
+        "total_agent": total_agent,
+        "closed_agent": closed_agent,
+        "close_rate_agent": close_rate_agent,
+        "overdue_agent": overdue_agent,
+        "avg_response_agent": avg_response_agent
+    }
+
 
     for row in new_leads:
         if row[0] and now - row[0] > timedelta(hours=2):
